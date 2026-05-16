@@ -131,7 +131,7 @@ export const nearbyAPI = {
 
 // --- Contributions ---
 export const contributionsAPI = {
-  submit: (data: { city: string; type: string; content: string }) =>
+  submit: (data: { city: string; type: string; content: string; details?: any }) =>
     api.post('/contributions', data),
 };
 

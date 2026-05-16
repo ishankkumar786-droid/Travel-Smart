@@ -178,7 +178,7 @@ export default function ExploreScreen() {
                   coordinate={{ latitude: p.location.lat, longitude: p.location.lng }}
                   title={p.name}
                   description={p.address}
-                  pinColor={Colors.red}
+                  pinColor={Colors.error}
                 />
               ) : null
             ))}
