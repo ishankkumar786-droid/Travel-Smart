@@ -2,12 +2,9 @@ import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
-// Use your computer's actual local IP address so physical phones on the same Wi-Fi can connect
-export const getBaseUrl = () => {
-  return 'http://192.168.29.222:5000/api';
-};
-
-const API_BASE_URL = getBaseUrl();
+// For local development, use your machine's IP address (e.g., 'http://192.168.1.XX:5000')
+// For production/deployment, use your Render URL
+const API_BASE_URL = 'https://travel-smart-o6mf.onrender.com/api';
 
 // Create axios instance
 const api: AxiosInstance = axios.create({

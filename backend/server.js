@@ -29,10 +29,10 @@ app.use(clerkMiddleware());
 // Security headers
 app.use(helmet());
 
-// CORS — allow all origins in development
+// CORS — allow all origins (important for mobile apps)
 app.use(
   cors({
-    origin: NODE_ENV === 'production' ? process.env.FRONTEND_URL : '*',
+    origin: '*',
     credentials: true,
   })
 );
