@@ -16,10 +16,7 @@
       "env": {
         "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
       },
-      "node": "22.14.0",
-      "install": {
-        "command": "npm install --legacy-peer-deps"
-      }
+      "node": "22.14.0"
     },
     "production": {
       "autoIncrement": true
