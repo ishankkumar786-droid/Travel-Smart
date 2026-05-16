@@ -12,6 +12,11 @@
       "supportsTablet": true
     },
     "android": {
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyDsJkU6LHE1nCGyZw4I9CE0fgIMYDDV4DA"
+        }
+      },
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -33,12 +38,19 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#0F2D3F",
           "dark": {
-            "backgroundColor": "#000000"
+            "backgroundColor": "#0F2D3F"
           }
         }
-      ]
+      ],
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow TravelSmart to use your location for nearby places."
+        }
+      ],
     ],
     "experiments": {
       "typedRoutes": true,
