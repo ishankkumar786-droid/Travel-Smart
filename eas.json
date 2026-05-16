@@ -14,7 +14,8 @@
         "buildType": "apk"
       },
       "env": {
-        "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
+        "NPM_CONFIG_LEGACY_PEER_DEPS": "true",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_bGVnaWJsZS13cmVuLTQxLmNsZXJrLmFjY291bnRzLmRldiQ"
       },
       "node": "22.14.0"
     },
