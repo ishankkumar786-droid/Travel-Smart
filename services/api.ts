@@ -110,6 +110,7 @@ export const tripsAPI = {
   save: (data: any) => api.post('/trips/save', data),
   getAll: () => api.get('/trips'),
   getById: (id: string) => api.get(`/trips/${id}`),
+  update: (id: string, itinerary: any) => api.put(`/trips/${id}`, { itinerary }),
   delete: (id: string) => api.delete(`/trips/${id}`),
 };
 

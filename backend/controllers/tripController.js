@@ -81,5 +81,22 @@ const deleteTrip = async (req, res) => {
   }
 };
 
-module.exports = { saveTrip, getMyTrips, getTripById, deleteTrip };
+const updateTrip = async (req, res) => {
+  try {
+    const { itinerary } = req.body;
+    console.log(`📝 Updating trip ${req.params.id} for user ${req.userId}`);
+    const trip = await Trip.findOneAndUpdate(
+      { _id: req.params.id, userId: req.userId },
+      { itinerary },
+      { new: true }
+    );
+    if (!trip) return res.status(404).json({ success: false, message: 'Trip not found.' });
+    res.json({ success: true, message: 'Trip updated successfully.', data: { trip } });
+  } catch (error) {
+    console.error('Update trip error:', error);
+    res.status(500).json({ success: false, message: 'Failed to update trip.' });
+  }
+};
+
+module.exports = { saveTrip, getMyTrips, getTripById, deleteTrip, updateTrip };
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Animated, Platform, Alert, Dimensions, TextInput,
-  KeyboardAvoidingView, ActivityIndicator, Keyboard,
+  KeyboardAvoidingView, ActivityIndicator, Keyboard, Modal, Pressable
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -35,7 +35,7 @@ export default function ItineraryScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { tripId } = useLocalSearchParams<{ tripId?: string }>();
-  const { currentItinerary, tripParams } = useTrip();
+  const { currentItinerary, setCurrentItinerary, tripParams } = useTrip();
   const { isAuthenticated } = useAuth();
   const isDark = useColorScheme() === 'dark';
   const theme = getThemeColors(isDark);
@@ -56,6 +56,21 @@ export default function ItineraryScreen() {
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
   const chatScrollRef = useRef<ScrollView>(null);
+
+  // Editing state
+  const [isEditing, setIsEditing] = useState(false);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editingDayNum, setEditingDayNum] = useState<number>(-1);
+  const [editingItemIndex, setEditingItemIndex] = useState<number>(-1);
+  const [editingItemType, setEditingItemType] = useState<'place' | 'food'>('place');
+  const [editName, setEditName] = useState('');
+  const [editCategory, setEditCategory] = useState('');
+  const [editBestTime, setEditBestTime] = useState('');
+  const [editDuration, setEditDuration] = useState('');
+  const [editEntryFee, setEditEntryFee] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editFamousFor, setEditFamousFor] = useState('');
+  const [editPriceRange, setEditPriceRange] = useState('');
 
   // Load trip from API when tripId is provided (coming from My Trips)
   useEffect(() => {
@@ -157,6 +172,163 @@ export default function ItineraryScreen() {
     setExpandedDay(expandedDay === dayNum ? -1 : dayNum);
   };
 
+  // Editing handlers
+  const handleEditPlace = (dayNum: number, index: number, place: any) => {
+    setEditingDayNum(dayNum);
+    setEditingItemIndex(index);
+    setEditingItemType('place');
+    setEditName(place.name || '');
+    setEditCategory(place.category || 'other');
+    setEditBestTime(place.bestTime || '');
+    setEditDuration(place.duration || '');
+    setEditEntryFee(place.entryFee || '');
+    setEditDescription(place.description || '');
+    setEditModalVisible(true);
+  };
+
+  const handleAddPlace = (dayNum: number) => {
+    setEditingDayNum(dayNum);
+    setEditingItemIndex(-1);
+    setEditingItemType('place');
+    setEditName('');
+    setEditCategory('other');
+    setEditBestTime('');
+    setEditDuration('');
+    setEditEntryFee('');
+    setEditDescription('');
+    setEditModalVisible(true);
+  };
+
+  const handleDeletePlace = (dayNum: number, index: number) => {
+    Alert.alert('Delete Attraction', 'Are you sure you want to remove this place from your itinerary?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          const itineraryCopy = JSON.parse(JSON.stringify(itinerary));
+          const dayObj = itineraryCopy.days.find((d: any) => d.day === dayNum);
+          if (dayObj) {
+            dayObj.places.splice(index, 1);
+            if (tripId) {
+              setLoadedItinerary(itineraryCopy);
+              try {
+                await tripsAPI.update(tripId, itineraryCopy);
+                storageService.saveItinerary(tripId, itineraryCopy);
+              } catch (err) {
+                console.error('Failed to sync delete:', err);
+              }
+            } else {
+              setCurrentItinerary(itineraryCopy);
+            }
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleEditFood = (dayNum: number, index: number, food: any) => {
+    setEditingDayNum(dayNum);
+    setEditingItemIndex(index);
+    setEditingItemType('food');
+    setEditName(food.name || '');
+    setEditFamousFor(food.famousFor || '');
+    setEditPriceRange(food.priceRange || '');
+    setEditModalVisible(true);
+  };
+
+  const handleAddFood = (dayNum: number) => {
+    setEditingDayNum(dayNum);
+    setEditingItemIndex(-1);
+    setEditingItemType('food');
+    setEditName('');
+    setEditFamousFor('');
+    setEditPriceRange('');
+    setEditModalVisible(true);
+  };
+
+  const handleDeleteFood = (dayNum: number, index: number) => {
+    Alert.alert('Delete Food Suggestion', 'Are you sure you want to remove this food suggestion?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          const itineraryCopy = JSON.parse(JSON.stringify(itinerary));
+          const dayObj = itineraryCopy.days.find((d: any) => d.day === dayNum);
+          if (dayObj) {
+            dayObj.food.splice(index, 1);
+            if (tripId) {
+              setLoadedItinerary(itineraryCopy);
+              try {
+                await tripsAPI.update(tripId, itineraryCopy);
+                storageService.saveItinerary(tripId, itineraryCopy);
+              } catch (err) {
+                console.error('Failed to sync delete:', err);
+              }
+            } else {
+              setCurrentItinerary(itineraryCopy);
+            }
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editName.trim()) {
+      Alert.alert('Error', 'Name is required');
+      return;
+    }
+
+    const itineraryCopy = JSON.parse(JSON.stringify(itinerary));
+    const dayObj = itineraryCopy.days.find((d: any) => d.day === editingDayNum);
+    if (!dayObj) return;
+
+    if (editingItemType === 'place') {
+      const updatedPlace = {
+        name: editName.trim(),
+        category: editCategory || 'other',
+        bestTime: editBestTime.trim() || undefined,
+        duration: editDuration.trim() || undefined,
+        entryFee: editEntryFee.trim() || undefined,
+        description: editDescription.trim() || undefined,
+      };
+
+      if (editingItemIndex === -1) {
+        dayObj.places.push(updatedPlace);
+      } else {
+        dayObj.places[editingItemIndex] = updatedPlace;
+      }
+    } else {
+      const updatedFood = {
+        name: editName.trim(),
+        famousFor: editFamousFor.trim() || undefined,
+        priceRange: editPriceRange.trim() || undefined,
+      };
+
+      if (editingItemIndex === -1) {
+        dayObj.food.push(updatedFood);
+      } else {
+        dayObj.food[editingItemIndex] = updatedFood;
+      }
+    }
+
+    if (tripId) {
+      setLoadedItinerary(itineraryCopy);
+      try {
+        await tripsAPI.update(tripId, itineraryCopy);
+        storageService.saveItinerary(tripId, itineraryCopy);
+      } catch (err) {
+        console.error('Failed to sync edit:', err);
+      }
+    } else {
+      setCurrentItinerary(itineraryCopy);
+    }
+
+    setEditModalVisible(false);
+  };
+
   const renderDayCard = (day: DayItinerary) => {
     const isExpanded = expandedDay === day.day;
     return (
@@ -187,7 +359,7 @@ export default function ItineraryScreen() {
             )}
 
             {/* Places */}
-            {day.places.length > 0 && (
+            {(day.places.length > 0 || isEditing) && (
               <View style={styles.section}>
                 <Text style={[styles.sectionLabel, { color: Colors.explore }]}>📍 PLACES TO VISIT</Text>
                 {day.places.map((place, i) => (
@@ -200,25 +372,58 @@ export default function ItineraryScreen() {
                         {place.duration && <Text style={[styles.placeMetaText, { color: theme.textSecondary }]}>⏱️ {place.duration}</Text>}
                       </View>
                       {place.entryFee && <Text style={[styles.placeMetaText, { color: theme.textSecondary }]}>🎫 {place.entryFee}</Text>}
+                      {place.description && <Text style={[styles.placeMetaText, { color: theme.textSecondary, marginTop: 4, fontStyle: 'italic' }]}>{place.description}</Text>}
                     </View>
+                    {isEditing && (
+                      <View style={styles.editControls}>
+                        <TouchableOpacity onPress={() => handleEditPlace(day.day, i, place)} style={styles.editCtrlBtn}>
+                          <Ionicons name="pencil" size={16} color={Colors.accent} />
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => handleDeletePlace(day.day, i)} style={styles.editCtrlBtn}>
+                          <Ionicons name="trash" size={16} color={Colors.error} />
+                        </TouchableOpacity>
+                      </View>
+                    )}
                   </View>
                 ))}
+                {isEditing && (
+                  <TouchableOpacity style={styles.addPlaceBtn} onPress={() => handleAddPlace(day.day)}>
+                    <Ionicons name="add-circle-outline" size={18} color={Colors.explore} />
+                    <Text style={styles.addPlaceText}>Add Attraction</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             )}
 
             {/* Food */}
-            {day.food.length > 0 && (
+            {(day.food.length > 0 || isEditing) && (
               <View style={styles.section}>
                 <Text style={[styles.sectionLabel, { color: Colors.orange }]}>🍜 FOOD SUGGESTIONS</Text>
                 {day.food.map((f, i) => (
-                  <View key={i} style={[styles.foodCard, { backgroundColor: isDark ? Colors.darkCardElevated : Colors.gray50 }]}>
+                  <View key={i} style={[styles.foodCard, { backgroundColor: isDark ? Colors.darkCardElevated : Colors.gray50, flexDirection: 'row', alignItems: 'center' }]}>
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.placeName, { color: theme.text }]}>{f.name}</Text>
                       {f.famousFor && <Text style={[styles.placeMetaText, { color: theme.textSecondary }]}>Famous for: {f.famousFor}</Text>}
                       {f.priceRange && <Text style={[styles.placeMetaText, { color: theme.textSecondary }]}>💰 {f.priceRange}</Text>}
                     </View>
+                    {isEditing && (
+                      <View style={styles.editControls}>
+                        <TouchableOpacity onPress={() => handleEditFood(day.day, i, f)} style={styles.editCtrlBtn}>
+                          <Ionicons name="pencil" size={16} color={Colors.accent} />
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => handleDeleteFood(day.day, i)} style={styles.editCtrlBtn}>
+                          <Ionicons name="trash" size={16} color={Colors.error} />
+                        </TouchableOpacity>
+                      </View>
+                    )}
                   </View>
                 ))}
+                {isEditing && (
+                  <TouchableOpacity style={styles.addFoodBtn} onPress={() => handleAddFood(day.day)}>
+                    <Ionicons name="add-circle-outline" size={18} color={Colors.orange} />
+                    <Text style={styles.addFoodText}>Add Food Suggestion</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             )}
 
@@ -272,6 +477,134 @@ export default function ItineraryScreen() {
     );
   };
 
+
+  // ===== Edit Place Modal =====
+  const renderEditModal = () => {
+    return (
+      <Modal
+        visible={editModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setEditModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <TouchableOpacity 
+            style={{ flex: 1 }} 
+            activeOpacity={1} 
+            onPress={() => setEditModalVisible(false)}
+          />
+          <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>
+                {editingItemIndex === -1 ? 'Add' : 'Edit'} {editingItemType === 'place' ? 'Attraction' : 'Food Suggestion'}
+              </Text>
+              <TouchableOpacity onPress={() => setEditModalVisible(false)}>
+                <Ionicons name="close" size={24} color={theme.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={styles.modalForm} showsVerticalScrollIndicator={false}>
+              <Text style={[styles.formLabel, { color: theme.textSecondary }]}>Name</Text>
+              <TextInput
+                style={[styles.formInput, { color: theme.text, backgroundColor: isDark ? Colors.darkCardElevated : Colors.gray50 }]}
+                value={editName}
+                onChangeText={setEditName}
+                placeholder="e.g. Taj Mahal"
+                placeholderTextColor={theme.textSecondary}
+              />
+
+              {editingItemType === 'place' ? (
+                <>
+                  <Text style={[styles.formLabel, { color: theme.textSecondary }]}>Category</Text>
+                  <View style={styles.categoryRow}>
+                    {Object.keys(categoryIcons).map((cat) => (
+                      <TouchableOpacity
+                        key={cat}
+                        style={[
+                          styles.catChip,
+                          editCategory === cat && { backgroundColor: Colors.accent },
+                        ]}
+                        onPress={() => setEditCategory(cat)}
+                      >
+                        <Text style={[styles.catChipText, editCategory === cat && { color: '#fff' }]}>
+                          {categoryIcons[cat]} {cat}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  <Text style={[styles.formLabel, { color: theme.textSecondary }]}>Best Time to Visit</Text>
+                  <TextInput
+                    style={[styles.formInput, { color: theme.text, backgroundColor: isDark ? Colors.darkCardElevated : Colors.gray50 }]}
+                    value={editBestTime}
+                    onChangeText={setEditBestTime}
+                    placeholder="e.g. 09:00 AM - 12:00 PM"
+                    placeholderTextColor={theme.textSecondary}
+                  />
+
+                  <Text style={[styles.formLabel, { color: theme.textSecondary }]}>Duration</Text>
+                  <TextInput
+                    style={[styles.formInput, { color: theme.text, backgroundColor: isDark ? Colors.darkCardElevated : Colors.gray50 }]}
+                    value={editDuration}
+                    onChangeText={setEditDuration}
+                    placeholder="e.g. 2 hours"
+                    placeholderTextColor={theme.textSecondary}
+                  />
+
+                  <Text style={[styles.formLabel, { color: theme.textSecondary }]}>Entry Fee</Text>
+                  <TextInput
+                    style={[styles.formInput, { color: theme.text, backgroundColor: isDark ? Colors.darkCardElevated : Colors.gray50 }]}
+                    value={editEntryFee}
+                    onChangeText={setEditEntryFee}
+                    placeholder="e.g. Free, ₹50"
+                    placeholderTextColor={theme.textSecondary}
+                  />
+
+                  <Text style={[styles.formLabel, { color: theme.textSecondary }]}>Description</Text>
+                  <TextInput
+                    style={[styles.formInput, styles.textArea, { color: theme.text, backgroundColor: isDark ? Colors.darkCardElevated : Colors.gray50 }]}
+                    value={editDescription}
+                    onChangeText={setEditDescription}
+                    placeholder="Brief details about the place..."
+                    placeholderTextColor={theme.textSecondary}
+                    multiline
+                    numberOfLines={3}
+                  />
+                </>
+              ) : (
+                <>
+                  <Text style={[styles.formLabel, { color: theme.textSecondary }]}>Famous For</Text>
+                  <TextInput
+                    style={[styles.formInput, { color: theme.text, backgroundColor: isDark ? Colors.darkCardElevated : Colors.gray50 }]}
+                    value={editFamousFor}
+                    onChangeText={setEditFamousFor}
+                    placeholder="e.g. Spicy Biryani, Local Lassi"
+                    placeholderTextColor={theme.textSecondary}
+                  />
+
+                  <Text style={[styles.formLabel, { color: theme.textSecondary }]}>Price Range</Text>
+                  <TextInput
+                    style={[styles.formInput, { color: theme.text, backgroundColor: isDark ? Colors.darkCardElevated : Colors.gray50 }]}
+                    value={editPriceRange}
+                    onChangeText={setEditPriceRange}
+                    placeholder="e.g. ₹200 for two, Budget-friendly"
+                    placeholderTextColor={theme.textSecondary}
+                  />
+                </>
+              )}
+
+              <TouchableOpacity style={styles.saveModalBtn} onPress={handleSaveEdit}>
+                <Text style={styles.saveModalBtnText}>Save Changes</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+    );
+  };
 
   // ===== Chat Panel =====
   const renderChatPanel = () => {
@@ -386,9 +719,14 @@ export default function ItineraryScreen() {
               <Ionicons name="arrow-back" size={24} color="#fff" />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Your Itinerary</Text>
-            <TouchableOpacity onPress={() => generateItineraryPDF(itinerary)} style={styles.headerBtn}>
-              <Ionicons name="download-outline" size={22} color="#fff" />
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+              <TouchableOpacity onPress={() => setIsEditing(!isEditing)} style={styles.headerBtn}>
+                <Ionicons name={isEditing ? "checkmark-circle" : "pencil"} size={22} color="#fff" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => generateItineraryPDF(itinerary)} style={styles.headerBtn}>
+                <Ionicons name="download-outline" size={22} color="#fff" />
+              </TouchableOpacity>
+            </View>
           </View>
           <Text style={styles.headerDest}>{itinerary.destination}</Text>
           <View style={styles.headerMeta}>
@@ -553,6 +891,7 @@ export default function ItineraryScreen() {
             </ScrollView>
           </View>
         )}
+        {renderEditModal()}
       </View>
     );
   }
@@ -567,7 +906,9 @@ export default function ItineraryScreen() {
             <Ionicons name="arrow-back" size={24} color="#fff" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Your Itinerary</Text>
-          <View style={{ width: 40 }} />
+          <TouchableOpacity onPress={() => setIsEditing(!isEditing)} style={styles.headerBtn}>
+            <Ionicons name={isEditing ? "checkmark-circle" : "pencil"} size={22} color="#fff" />
+          </TouchableOpacity>
         </View>
         <Text style={styles.headerDest}>{itinerary.destination}</Text>
         <View style={styles.headerMeta}>
@@ -647,6 +988,7 @@ export default function ItineraryScreen() {
 
       {/* Chat Panel Overlay */}
       {renderChatPanel()}
+      {renderEditModal()}
     </View>
   );
 }
@@ -732,4 +1074,26 @@ const styles = StyleSheet.create({
   contributeSubtitle: { fontSize: FontSizes.base, textAlign: 'center', lineHeight: 22, paddingHorizontal: 20 },
   contributeCTA: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.orange, paddingHorizontal: 24, paddingVertical: 14, borderRadius: Radius.lg, marginTop: 8 },
   contributeCTAText: { color: '#fff', fontSize: FontSizes.md, fontWeight: FontWeights.bold },
+
+  // Editing styling
+  editControls: { flexDirection: 'row', gap: 8, marginLeft: 10, alignSelf: 'center' },
+  editCtrlBtn: { padding: 6, borderRadius: Radius.sm, backgroundColor: 'rgba(0,0,0,0.03)' },
+  addPlaceBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 10, paddingHorizontal: 12, borderRadius: Radius.md, borderStyle: 'dashed', borderWidth: 1, borderColor: Colors.explore, justifyContent: 'center', marginTop: 4 },
+  addPlaceText: { fontSize: FontSizes.sm, color: Colors.explore, fontWeight: FontWeights.semibold },
+  addFoodBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 10, paddingHorizontal: 12, borderRadius: Radius.md, borderStyle: 'dashed', borderWidth: 1, borderColor: Colors.orange, justifyContent: 'center', marginTop: 4 },
+  addFoodText: { fontSize: FontSizes.sm, color: Colors.orange, fontWeight: FontWeights.semibold },
+
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalContent: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 24, maxHeight: '85%' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 0.5 },
+  modalTitle: { fontSize: FontSizes.md, fontWeight: FontWeights.bold },
+  modalForm: { padding: 20 },
+  formLabel: { fontSize: FontSizes.xs, fontWeight: FontWeights.bold, marginBottom: 6, marginTop: 12 },
+  formInput: { borderRadius: Radius.md, paddingHorizontal: 12, paddingVertical: 10, fontSize: FontSizes.sm, borderWidth: 0.5, borderColor: 'rgba(0,0,0,0.1)' },
+  textArea: { height: 80, textAlignVertical: 'top' },
+  categoryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 6, marginTop: 4 },
+  catChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: Radius.full, backgroundColor: 'rgba(0,0,0,0.05)' },
+  catChipText: { fontSize: FontSizes.xs, color: '#333' },
+  saveModalBtn: { backgroundColor: Colors.accent, paddingVertical: 14, borderRadius: Radius.md, alignItems: 'center', marginTop: 24 },
+  saveModalBtnText: { color: '#fff', fontSize: FontSizes.md, fontWeight: FontWeights.bold },
 });
