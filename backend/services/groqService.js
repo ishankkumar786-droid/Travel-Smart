@@ -33,7 +33,7 @@ const answerChat = async (message, context, history = []) => {
 ITINERARY CONTEXT (JSON):
 ${itineraryJSON}
 
-You can either ANSWER questions about the itinerary, or MUTATE/MODIFY the itinerary if the user requests changes (e.g., "move Taj Mahal from day 1 to day 3", "delete Akshardham Temple", "add a restaurant to day 2", or "change timing of palace to 9am").
+You can either ANSWER questions about the itinerary, or MUTATE/MODIFY the itinerary if the user requests structural changes (e.g., "move Taj Mahal from day 2 to day 1", "delete Akshardham Temple", "add a restaurant to day 2", "change timing of palace to 9am").
 
 Your response MUST be a JSON object with this exact structure:
 {
@@ -42,11 +42,10 @@ Your response MUST be a JSON object with this exact structure:
   "itinerary": null or the fully updated/mutated itinerary JSON object (if action is "update")
 }
 
-RULES:
-1. If the user is just asking a question or chatting, set "action" to "answer", put the response in "explanation", and set "itinerary" to null.
-2. If the user requests any modification, perform the edit on the itinerary context, set "action" to "update", put a clear confirmation message in "explanation" (e.g. "Done! I've moved Taj Mahal to Day 3 for you."), and return the fully updated itinerary JSON object in "itinerary".
-3. Return ONLY valid JSON.
-4. Keep the same structure, keys, and values for the itinerary when mutating, only changing the days/places/food/etc as requested.`;
+CRITICAL ANTI-HALLUCINATION RULES:
+1. NO FAKE CONFIRMATIONS: If you set "action" to "answer" and "itinerary" to null, you are STRICTLY FORBIDDEN from saying "I have moved", "I have deleted", "I have added", or "Done". You MUST instead reply: "I'm sorry, I could not apply that change directly. Please use the pencil edit icon in the top right to customize your itinerary manually!"
+2. TO APPLY AN UPDATE: You must perform the exact mutation requested on the ITINERARY CONTEXT JSON (e.g., for "move from day 2 to day 1", locate the attraction under day 2's places, remove it from day 2, and append it to day 1's places). Set "action" to "update", put a confirmation in "explanation" (e.g. "Done! I have successfully moved Taj Mahal to Day 1."), and return the ENTIRE mutated itinerary JSON object in "itinerary".
+3. RETURN VALID JSON ONLY: The "itinerary" key must contain the full, parsed JSON object, maintaining the exact keys and structures of the original context. Do not wrap it in markdown block tags inside the JSON.`;
 
     const chatCompletion = await groq.chat.completions.create({
       messages: [
@@ -60,11 +59,20 @@ RULES:
       max_tokens: 1024,
     });
 
-    const parsed = JSON.parse(chatCompletion.choices[0].message.content.trim());
-    return parsed;
+    const content = chatCompletion.choices[0].message.content.trim();
+    try {
+      const parsed = JSON.parse(content);
+      return parsed;
+    } catch (e) {
+      console.warn('⚠️ Failed to parse LLM response as JSON. Raw output was:', content);
+      return {
+        action: 'answer',
+        explanation: "I'm sorry, I encountered a temporary formatting issue. Please use the pencil edit icon in the top right corner to modify your itinerary manually!",
+        itinerary: null
+      };
+    }
   } catch (error) {
     console.error('Groq Error:', error.message);
-    // Return backward compatible response on error
     return {
       action: 'answer',
       explanation: 'I encountered an error trying to process your request. Please try again.',
