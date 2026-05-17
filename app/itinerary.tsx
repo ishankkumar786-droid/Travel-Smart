@@ -164,16 +164,30 @@ export default function ItineraryScreen() {
 
       // If AI mutated the itinerary, apply changes dynamically
       if (action === 'update' && mutatedItinerary) {
-        if (tripId) {
-          setLoadedItinerary(mutatedItinerary);
-          try {
-            await tripsAPI.update(tripId, mutatedItinerary);
-            storageService.saveItinerary(tripId, mutatedItinerary);
-          } catch (err) {
-            console.error('Failed to sync chat modification:', err);
+        // 1. Unwrap nested itinerary fields if LLM wrapped them twice
+        let cleanedItinerary = mutatedItinerary;
+        if (mutatedItinerary.itinerary) {
+          cleanedItinerary = mutatedItinerary.itinerary;
+        }
+        if (cleanedItinerary.itinerary) {
+          cleanedItinerary = cleanedItinerary.itinerary;
+        }
+
+        // 2. Validate itinerary layout satisfies days collection structure
+        if (cleanedItinerary && cleanedItinerary.days && Array.isArray(cleanedItinerary.days)) {
+          if (tripId) {
+            setLoadedItinerary(cleanedItinerary);
+            try {
+              await tripsAPI.update(tripId, cleanedItinerary);
+              storageService.saveItinerary(tripId, cleanedItinerary);
+            } catch (err) {
+              console.error('Failed to sync chat modification:', err);
+            }
+          } else {
+            setCurrentItinerary(cleanedItinerary);
           }
         } else {
-          setCurrentItinerary(mutatedItinerary);
+          console.warn('AI returned update action but valid days collection was missing:', cleanedItinerary);
         }
       }
     } catch (err) {
@@ -751,7 +765,7 @@ export default function ItineraryScreen() {
             <View style={[styles.modePill, { backgroundColor: itinerary.mode === 'premium' ? 'rgba(255,255,255,0.2)' : 'rgba(108,92,231,0.3)' }]}>
               <Text style={styles.modeText}>{itinerary.mode === 'premium' ? '⭐ Premium' : '🤖 AI Generated'}</Text>
             </View>
-            <Text style={styles.headerMetaText}>{itinerary.days.length} days • {itinerary.budget} budget</Text>
+            <Text style={styles.headerMetaText}>{(itinerary.days || []).length} days • {itinerary.budget} budget</Text>
           </View>
         </LinearGradient>
 
@@ -812,7 +826,7 @@ export default function ItineraryScreen() {
                 </View>
               )}
 
-              {itinerary.days.map(renderDayCard)}
+              {(itinerary.days || []).map(renderDayCard)}
               <View style={{ height: 30 }} />
             </ScrollView>
           </Animated.View>
@@ -933,7 +947,7 @@ export default function ItineraryScreen() {
           <View style={[styles.modePill, { backgroundColor: itinerary.mode === 'premium' ? 'rgba(255,255,255,0.2)' : 'rgba(108,92,231,0.3)' }]}>
             <Text style={styles.modeText}>{itinerary.mode === 'premium' ? '⭐ Premium' : '🤖 AI Generated'}</Text>
           </View>
-          <Text style={styles.headerMetaText}>{itinerary.days.length} days • {itinerary.budget} budget</Text>
+          <Text style={styles.headerMetaText}>{(itinerary.days || []).length} days • {itinerary.budget} budget</Text>
         </View>
       </LinearGradient>
 
@@ -975,7 +989,7 @@ export default function ItineraryScreen() {
             </View>
           )}
 
-          {itinerary.days.map(renderDayCard)}
+          {(itinerary.days || []).map(renderDayCard)}
           <View style={{ height: 100 }} />
         </ScrollView>
       </Animated.View>
