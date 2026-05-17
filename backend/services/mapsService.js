@@ -21,6 +21,64 @@ const setCache = (key, data) => {
   }
 };
 
+const CITY_COORDINATES_FALLBACK = {
+  'delhi': { lat: 28.6139, lon: 77.2090 },
+  'new delhi': { lat: 28.6139, lon: 77.2090 },
+  'mumbai': { lat: 19.0760, lon: 72.8777 },
+  'bangalore': { lat: 12.9716, lon: 77.5946 },
+  'bengaluru': { lat: 12.9716, lon: 77.5946 },
+  'hyderabad': { lat: 17.3850, lon: 78.4867 },
+  'chennai': { lat: 13.0827, lon: 80.2707 },
+  'kolkata': { lat: 22.5726, lon: 88.3639 },
+  'varanasi': { lat: 25.3176, lon: 82.9739 },
+  'banaras': { lat: 25.3176, lon: 82.9739 },
+  'prayagraj': { lat: 25.4358, lon: 81.8463 },
+  'allahabad': { lat: 25.4358, lon: 81.8463 },
+  'katra': { lat: 32.9926, lon: 74.9318 },
+  'jaipur': { lat: 26.9124, lon: 75.7873 },
+  'manali': { lat: 32.2396, lon: 77.1887 },
+  'lucknow': { lat: 26.8467, lon: 80.9462 },
+  'agra': { lat: 27.1767, lon: 78.0081 },
+  'goa': { lat: 15.2993, lon: 74.1240 },
+  'kochi': { lat: 9.9312, lon: 76.2673 },
+  'amritsar': { lat: 31.6340, lon: 74.8723 },
+  'udaipur': { lat: 24.5854, lon: 73.7125 },
+  'rishikesh': { lat: 30.0869, lon: 78.2676 },
+  'haridwar': { lat: 29.9457, lon: 78.1642 },
+  'shimla': { lat: 31.1048, lon: 77.1734 },
+  'dharamshala': { lat: 32.2190, lon: 76.3234 },
+  'munnar': { lat: 10.0889, lon: 77.0595 },
+  'ooty': { lat: 11.4102, lon: 76.6950 },
+  'kodaikanal': { lat: 10.2381, lon: 77.4892 },
+  'hampi': { lat: 15.3350, lon: 76.4600 },
+  'jaisalmer': { lat: 26.9157, lon: 70.9083 },
+  'pune': { lat: 18.5204, lon: 73.8567 },
+  'dehradun': { lat: 30.3165, lon: 78.0322 },
+  'srinagar': { lat: 34.0837, lon: 74.7973 },
+  'manipal': { lat: 13.3485, lon: 74.7925 },
+  'patna': { lat: 25.5941, lon: 85.1376 },
+  'bhopal': { lat: 23.2599, lon: 77.4126 },
+  'indore': { lat: 22.7196, lon: 75.8577 },
+  'ranchi': { lat: 23.3441, lon: 85.3096 },
+  'guwahati': { lat: 26.1445, lon: 91.7362 },
+  'noida': { lat: 28.5355, lon: 77.3910 },
+  'gurgaon': { lat: 28.4595, lon: 77.0266 },
+  'ayodhya': { lat: 26.7922, lon: 82.1998 },
+  'gulmarg': { lat: 34.0484, lon: 74.3805 },
+  'pahalgam': { lat: 34.0161, lon: 75.3150 },
+  'kasol': { lat: 32.0099, lon: 77.3149 },
+  'gokarna': { lat: 14.5479, lon: 74.3188 },
+  'pushkar': { lat: 26.4897, lon: 74.5511 },
+  'mount abu': { lat: 24.5925, lon: 72.7156 },
+  'alappuzha': { lat: 9.4981, lon: 76.3388 },
+  'varkala': { lat: 8.7338, lon: 76.7059 },
+  'kumarakom': { lat: 9.5937, lon: 76.4225 },
+  'wayanad': { lat: 11.6854, lon: 76.1320 },
+  'shillong': { lat: 25.5788, lon: 91.8833 },
+  'gangtok': { lat: 27.3314, lon: 88.6138 },
+  'dalhousie': { lat: 32.5387, lon: 75.9710 },
+};
+
 /**
  * Geocode a location string to coordinates using OpenStreetMap Nominatim
  */
@@ -29,6 +87,12 @@ const geocodeLocation = async (locationName) => {
   const cached = getCached(cacheKey);
   if (cached) return cached;
 
+  const key = locationName.toLowerCase().trim();
+  if (CITY_COORDINATES_FALLBACK[key]) {
+    console.log(`📍 Geocode: Found static fallback coordinates for: ${locationName}`);
+    return CITY_COORDINATES_FALLBACK[key];
+  }
+
   try {
     const res = await axios.get('https://nominatim.openstreetmap.org/search', {
       params: { q: locationName, format: 'json', limit: 1 },
@@ -36,7 +100,7 @@ const geocodeLocation = async (locationName) => {
     });
     
     if (res.data && res.data.length > 0) {
-      const coords = { lat: res.data[0].lat, lon: res.data[0].lon };
+      const coords = { lat: parseFloat(res.data[0].lat), lon: parseFloat(res.data[0].lon) };
       setCache(cacheKey, coords);
       return coords;
     }
