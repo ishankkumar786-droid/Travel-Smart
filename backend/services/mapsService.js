@@ -32,7 +32,7 @@ const geocodeLocation = async (locationName) => {
   try {
     const res = await axios.get('https://nominatim.openstreetmap.org/search', {
       params: { q: locationName, format: 'json', limit: 1 },
-      headers: { 'User-Agent': 'SmartTravelApp/1.0' },
+      headers: { 'User-Agent': 'TravelSmart/1.0 (contact@example.com)' },
     });
     
     if (res.data && res.data.length > 0) {
@@ -68,12 +68,17 @@ const getDistanceMatrix = async (origin, destination, mode = 'driving') => {
     const osrmMode = mode === 'walking' ? 'foot' : 'driving';
     const osrmUrl = `http://router.project-osrm.org/route/v1/${osrmMode}/${originCoords.lon},${originCoords.lat};${destCoords.lon},${destCoords.lat}?overview=false`;
     
-    const res = await axios.get(osrmUrl);
+    let route = null;
+    try {
+      const res = await axios.get(osrmUrl, { timeout: 3000 });
+      if (res.data?.code === 'Ok' && res.data.routes.length > 0) {
+        route = res.data.routes[0];
+      }
+    } catch (osrmError) {
+      console.warn('OSRM API blocked/failed, falling back to Haversine calculation');
+    }
 
-    if (res.data?.code === 'Ok' && res.data.routes.length > 0) {
-      const route = res.data.routes[0];
-      
-      // Convert distance (meters) and duration (seconds) to human readable
+    if (route) {
       const distanceKm = (route.distance / 1000).toFixed(1);
       let durationStr = '';
       const hours = Math.floor(route.duration / 3600);
@@ -90,11 +95,42 @@ const getDistanceMatrix = async (origin, destination, mode = 'driving') => {
       };
       setCache(cacheKey, result);
       return result;
-    }
+    } else {
+      // Haversine fallback
+      const R = 6371; // Earth's radius in km
+      const dLat = (destCoords.lat - originCoords.lat) * Math.PI / 180;
+      const dLon = (destCoords.lon - originCoords.lon) * Math.PI / 180;
+      const a = 
+        Math.sin(dLat/2) * Math.sin(dLat/2) +
+        Math.cos(originCoords.lat * Math.PI / 180) * Math.cos(destCoords.lat * Math.PI / 180) * 
+        Math.sin(dLon/2) * Math.sin(dLon/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      
+      const straightLineKm = R * c;
+      const roadDistanceKm = (straightLineKm * 1.3).toFixed(1); // Add 30% for road curvature
+      
+      const speedKmh = mode === 'walking' ? 5 : 60; // 60 km/h average driving speed
+      const durationHours = (roadDistanceKm / speedKmh);
+      
+      const hours = Math.floor(durationHours);
+      const minutes = Math.floor((durationHours - hours) * 60);
+      
+      let durationStr = '';
+      if (hours > 0) durationStr += `${hours} hour${hours > 1 ? 's' : ''} `;
+      if (minutes > 0 || hours === 0) durationStr += `${minutes} min`;
 
-    return { distance: 'N/A', duration: 'N/A', status: res.data?.code || 'ERROR' };
+      const result = {
+        distance: `${roadDistanceKm} km`,
+        duration: `~${durationStr.trim()}`,
+        distanceValue: roadDistanceKm * 1000,
+        durationValue: durationHours * 3600,
+        status: 'OK (Estimated)',
+      };
+      setCache(cacheKey, result);
+      return result;
+    }
   } catch (error) {
-    console.error('OSRM error:', error.message);
+    console.error('Maps routing error:', error.message);
     return { distance: 'N/A', duration: 'N/A', status: 'ERROR' };
   }
 };

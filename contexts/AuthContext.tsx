@@ -48,15 +48,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const refreshUser = useCallback(async () => {
+  const refreshUser = useCallback(async (retries = 3) => {
     if (isSignedIn) {
       try {
         const res = await authAPI.verify();
         if (res.data.success && res.data.data.user) {
           setDbUser(res.data.data.user);
         }
-      } catch (e) {
-        console.error('Failed to fetch user from DB:', e);
+      } catch (e: any) {
+        if (e.status === 401 && retries > 0) {
+          console.log(`Token sync delayed, retrying in 1s... (${retries} left)`);
+          setTimeout(() => refreshUser(retries - 1), 1000);
+        } else {
+          console.error('Failed to fetch user from DB:', e);
+        }
       }
     } else {
       setDbUser(null);
