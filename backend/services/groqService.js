@@ -33,19 +33,14 @@ const answerChat = async (message, context, history = []) => {
 ITINERARY CONTEXT (JSON):
 ${itineraryJSON}
 
-You can either ANSWER questions about the itinerary, or MUTATE/MODIFY the itinerary if the user requests structural changes (e.g., "move Taj Mahal from day 2 to day 1", "delete Akshardham Temple", "add a restaurant to day 2", "change timing of palace to 9am").
-
-Your response MUST be a JSON object with this exact structure:
+RULES:
+1. Answer questions based on the itinerary context provided. Keep answers concise and conversational (max 3 sentences).
+2. STRICTOR ANTI-HALLUCINATION RULE: If the user asks you to MODIFY, MOVE, DELETE, ADD, REORDER, or EDIT any attraction, place, or food suggestion, you MUST reply: "I'm sorry, I cannot modify your itinerary directly through chat. Please use the pencil edit icon in the top right to customize your itinerary manually!"
+3. You are completely unable to edit the JSON. You are STRICTLY FORBIDDEN from saying "Done", "I updated it", "I have moved it", or pretending you changed anything.
+4. Return your response as a JSON object with a single key "answer":
 {
-  "action": "answer" or "update",
-  "explanation": "Your conversational text response to the user. Max 3 sentences.",
-  "itinerary": null or the fully updated/mutated itinerary JSON object (if action is "update")
-}
-
-CRITICAL ANTI-HALLUCINATION RULES:
-1. NO FAKE CONFIRMATIONS: If you set "action" to "answer" and "itinerary" to null, you are STRICTLY FORBIDDEN from saying "I have moved", "I have deleted", "I have added", or "Done". You MUST instead reply: "I'm sorry, I could not apply that change directly. Please use the pencil edit icon in the top right to customize your itinerary manually!"
-2. TO APPLY AN UPDATE: You must perform the exact mutation requested on the ITINERARY CONTEXT JSON (e.g., for "move from day 2 to day 1", locate the attraction under day 2's places, remove it from day 2, and append it to day 1's places). Set "action" to "update", put a confirmation in "explanation" (e.g. "Done! I have successfully moved Taj Mahal to Day 1."), and return the ENTIRE mutated itinerary JSON object in "itinerary".
-3. RETURN VALID JSON ONLY: The "itinerary" key must contain the full, parsed JSON object, maintaining the exact keys and structures of the original context. Do not wrap it in markdown block tags inside the JSON.`;
+  "answer": "Your conversational text response here."
+}`;
 
     const chatCompletion = await groq.chat.completions.create({
       messages: [
@@ -55,19 +50,23 @@ CRITICAL ANTI-HALLUCINATION RULES:
       ],
       model: 'llama-3.1-8b-instant',
       response_format: { type: 'json_object' },
-      temperature: 0.2,
-      max_tokens: 1024,
+      temperature: 0.1,
+      max_tokens: 512,
     });
 
     const content = chatCompletion.choices[0].message.content.trim();
     try {
       const parsed = JSON.parse(content);
-      return parsed;
+      return {
+        action: 'answer',
+        answer: parsed.answer || parsed.explanation || '',
+        itinerary: null
+      };
     } catch (e) {
       console.warn('⚠️ Failed to parse LLM response as JSON. Raw output was:', content);
       return {
         action: 'answer',
-        explanation: "I'm sorry, I encountered a temporary formatting issue. Please use the pencil edit icon in the top right corner to modify your itinerary manually!",
+        answer: "I'm sorry, I encountered a temporary formatting issue. Please use the pencil edit icon in the top right corner to modify your itinerary manually!",
         itinerary: null
       };
     }
@@ -75,7 +74,7 @@ CRITICAL ANTI-HALLUCINATION RULES:
     console.error('Groq Error:', error.message);
     return {
       action: 'answer',
-      explanation: 'I encountered an error trying to process your request. Please try again.',
+      answer: 'I encountered an error trying to process your request. Please try again.',
       itinerary: null
     };
   }
