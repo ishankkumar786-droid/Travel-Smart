@@ -377,10 +377,10 @@ export default function ItineraryScreen() {
             )}
 
             {/* Places */}
-            {(day.places.length > 0 || isEditing) && (
+            {((day.places && day.places.length > 0) || isEditing) && (
               <View style={styles.section}>
                 <Text style={[styles.sectionLabel, { color: Colors.explore }]}>📍 PLACES TO VISIT</Text>
-                {day.places.map((place, i) => (
+                {(day.places || []).map((place, i) => (
                   <View key={i} style={[styles.placeCard, { backgroundColor: isDark ? Colors.darkCardElevated : Colors.gray50 }]}>
                     <Text style={styles.placeEmoji}>{categoryIcons[place.category] || '📍'}</Text>
                     <View style={{ flex: 1 }}>
@@ -414,10 +414,10 @@ export default function ItineraryScreen() {
             )}
 
             {/* Food */}
-            {(day.food.length > 0 || isEditing) && (
+            {((day.food && day.food.length > 0) || isEditing) && (
               <View style={styles.section}>
                 <Text style={[styles.sectionLabel, { color: Colors.orange }]}>🍜 FOOD SUGGESTIONS</Text>
-                {day.food.map((f, i) => (
+                {(day.food || []).map((f, i) => (
                   <View key={i} style={[styles.foodCard, { backgroundColor: isDark ? Colors.darkCardElevated : Colors.gray50, flexDirection: 'row', alignItems: 'center' }]}>
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.placeName, { color: theme.text }]}>{f.name}</Text>
@@ -457,10 +457,10 @@ export default function ItineraryScreen() {
             )}
 
             {/* Local Gems */}
-            {day.localGems && day.localGems.length > 0 && (
+            {day.localGems && (day.localGems || []).length > 0 && (
               <View style={styles.section}>
                 <Text style={[styles.sectionLabel, { color: Colors.yellow }]}>🔥 LOCAL GEMS</Text>
-                {day.localGems.map((gem, i) => (
+                {(day.localGems || []).map((gem, i) => (
                   <View key={i} style={[styles.gemCard, { borderColor: Colors.yellow + '40' }]}>
                     <Text style={styles.gemBadge}>🔥 Local Favorite</Text>
                     <Text style={[styles.placeName, { color: theme.text }]}>{gem.name}</Text>
@@ -471,20 +471,20 @@ export default function ItineraryScreen() {
             )}
 
             {/* Tips */}
-            {day.tips.length > 0 && (
+            {day.tips && (day.tips || []).length > 0 && (
               <View style={styles.section}>
                 <Text style={[styles.sectionLabel, { color: Colors.info }]}>💡 TIPS</Text>
-                {day.tips.map((tip, i) => (
+                {(day.tips || []).map((tip, i) => (
                   <Text key={i} style={[styles.tipText, { color: theme.text }]}>• {tip}</Text>
                 ))}
               </View>
             )}
 
             {/* Avoid */}
-            {day.avoid.length > 0 && (
+            {day.avoid && (day.avoid || []).length > 0 && (
               <View style={styles.section}>
                 <Text style={[styles.sectionLabel, { color: Colors.error }]}>⚠️ AVOID</Text>
-                {day.avoid.map((a, i) => (
+                {(day.avoid || []).map((a, i) => (
                   <Text key={i} style={[styles.tipText, { color: theme.textSecondary }]}>• {a}</Text>
                 ))}
               </View>
