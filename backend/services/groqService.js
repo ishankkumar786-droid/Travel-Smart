@@ -25,39 +25,51 @@ const answerChat = async (message, context, history = []) => {
     throw new Error('Groq API not configured');
   }
 
+  const itineraryJSON = typeof context === 'object' ? JSON.stringify(context, null, 2) : context;
+
   try {
-    const messages = [
-      {
-        role: 'system',
-        content: `You are a helpful travel assistant. You are helping a user with their trip itinerary.
+    const prompt = `You are a helpful travel assistant. You are helping a user with their trip itinerary.
         
-ITINERARY CONTEXT:
-${context}
+ITINERARY CONTEXT (JSON):
+${itineraryJSON}
+
+You can either ANSWER questions about the itinerary, or MUTATE/MODIFY the itinerary if the user requests changes (e.g., "move Taj Mahal from day 1 to day 3", "delete Akshardham Temple", "add a restaurant to day 2", or "change timing of palace to 9am").
+
+Your response MUST be a JSON object with this exact structure:
+{
+  "action": "answer" or "update",
+  "explanation": "Your conversational text response to the user. Max 3 sentences.",
+  "itinerary": null or the fully updated/mutated itinerary JSON object (if action is "update")
+}
 
 RULES:
-1. Answer based on the itinerary context provided.
-2. Be concise and conversational (max 3-4 sentences).
-3. If asked about places/food not in the context, use your general knowledge but mention they are "extra suggestions."
-4. Use ₹ for costs in ranges.
-5. Do NOT try to regenerate the entire itinerary. Just answer the question.`
-      },
-      ...history,
-      { role: 'user', content: message }
-    ];
+1. If the user is just asking a question or chatting, set "action" to "answer", put the response in "explanation", and set "itinerary" to null.
+2. If the user requests any modification, perform the edit on the itinerary context, set "action" to "update", put a clear confirmation message in "explanation" (e.g. "Done! I've moved Taj Mahal to Day 3 for you."), and return the fully updated itinerary JSON object in "itinerary".
+3. Return ONLY valid JSON.
+4. Keep the same structure, keys, and values for the itinerary when mutating, only changing the days/places/food/etc as requested.`;
 
     const chatCompletion = await groq.chat.completions.create({
-      messages,
+      messages: [
+        { role: 'system', content: prompt },
+        ...history,
+        { role: 'user', content: message }
+      ],
       model: 'llama-3.1-8b-instant',
-      temperature: 0.7,
-      max_tokens: 512,
-      top_p: 1,
-      stream: false,
+      response_format: { type: 'json_object' },
+      temperature: 0.2,
+      max_tokens: 1024,
     });
 
-    return chatCompletion.choices[0].message.content;
+    const parsed = JSON.parse(chatCompletion.choices[0].message.content.trim());
+    return parsed;
   } catch (error) {
     console.error('Groq Error:', error.message);
-    throw error;
+    // Return backward compatible response on error
+    return {
+      action: 'answer',
+      explanation: 'I encountered an error trying to process your request. Please try again.',
+      itinerary: null
+    };
   }
 };
 

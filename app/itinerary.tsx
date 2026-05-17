@@ -157,9 +157,27 @@ export default function ItineraryScreen() {
 
     try {
       const res = await chatAPI.ask(question, itinerary);
-      const assistantMsg: ChatMessage = { role: 'assistant', content: res.data.data.answer };
+      const { answer, action, itinerary: mutatedItinerary } = res.data.data;
+      
+      const assistantMsg: ChatMessage = { role: 'assistant', content: answer || 'Done!' };
       setChatMessages((prev) => [...prev, assistantMsg]);
-    } catch {
+
+      // If AI mutated the itinerary, apply changes dynamically
+      if (action === 'update' && mutatedItinerary) {
+        if (tripId) {
+          setLoadedItinerary(mutatedItinerary);
+          try {
+            await tripsAPI.update(tripId, mutatedItinerary);
+            storageService.saveItinerary(tripId, mutatedItinerary);
+          } catch (err) {
+            console.error('Failed to sync chat modification:', err);
+          }
+        } else {
+          setCurrentItinerary(mutatedItinerary);
+        }
+      }
+    } catch (err) {
+      console.error('Chat error:', err);
       setChatMessages((prev) => [...prev, { role: 'assistant', content: 'Sorry, I could not process your question. Please try again.' }]);
     }
     setChatLoading(false);

@@ -18,9 +18,16 @@ const chat = async (req, res) => {
     const compactHistory = ragService.summarizeHistory(history);
 
     // 3. Get response from Groq (Llama)
-    const answer = await groqService.answerChat(message, relevantContext, compactHistory);
+    const result = await groqService.answerChat(message, relevantContext, compactHistory);
     
-    res.json({ success: true, data: { answer } });
+    res.json({ 
+      success: true, 
+      data: { 
+        answer: result.explanation || result.answer || '',
+        action: result.action || 'answer',
+        itinerary: result.itinerary || null
+      } 
+    });
   } catch (error) {
     console.error('Chat Controller Error:', error.message);
     res.status(500).json({ success: false, message: 'Failed to get answer from AI Assistant' });
